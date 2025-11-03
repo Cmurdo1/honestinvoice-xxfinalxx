@@ -62,7 +62,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [showPaywall, setShowPaywall] = useState(false)
   const [paywallFeature, setPaywallFeature] = useState('')
   const [paywallRequiredPlan, setPaywallRequiredPlan] = useState<'pro' | 'business'>('pro')
-  const { canCreateInvoice, canAddTeamMember, hasFeature, getPlanType, usage, features } = useSubscription()
+  const { canCreateInvoice, canAddTeamMember, hasFeature, getPlanType, usage, features, canAccessAPI, canUseCustomTemplates, canUseAutomatedReminders, canUseAdvancedTransparency, verifyFeatureAccess } = useSubscription()
   const isAdmin = session.user?.email === 'murdochcpm_08@yahoo.com'
   const [stats, setStats] = useState({
     totalInvoices: 0,

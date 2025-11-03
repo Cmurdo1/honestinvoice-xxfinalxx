@@ -226,7 +226,7 @@ export default function PricingPage() {
               className="bg-primary text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-600 transition-colors w-full flex items-center justify-center space-x-2"
             >
               <span>Contact Sales</span>
-              <span className="text-sm font-normal">(1-971-238-2472)</span>
+              <span className="text-sm font-normal">(1-800-238-XXXX)</span>
             </button>
             <p className="text-sm text-gray-500">
               Or email us at sales@honestinvoice.com

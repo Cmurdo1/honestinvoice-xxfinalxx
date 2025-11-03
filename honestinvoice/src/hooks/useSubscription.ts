@@ -122,6 +122,24 @@ export function useSubscription() {
     return features?.[feature] === true
   }
 
+  // Specific feature checkers for new Business-tier features
+  const canAccessAPI = () => hasFeature('has_api_access')
+  const canUseCustomTemplates = () => hasFeature('has_custom_templates')
+  const canUseAutomatedReminders = () => hasFeature('has_automated_reminders')
+  const canUseAdvancedTransparency = () => hasFeature('has_advanced_transparency')
+
+  // Comprehensive subscription verification for features
+  const verifyFeatureAccess = (feature: 'api' | 'custom_templates' | 'automated_reminders' | 'advanced_transparency') => {
+    const featureMap = {
+      api: canAccessAPI(),
+      custom_templates: canUseCustomTemplates(),
+      automated_reminders: canUseAutomatedReminders(),
+      advanced_transparency: canUseAdvancedTransparency()
+    }
+    
+    return featureMap[feature] || false
+  }
+
   const getPlanType = () => {
     return subscription?.plans.plan_type || 'free'
   }
@@ -139,6 +157,11 @@ export function useSubscription() {
     canAddTeamMember,
     hasFeature,
     getPlanType,
-    refreshSubscription
+    refreshSubscription,
+    canAccessAPI,
+    canUseCustomTemplates,
+    canUseAutomatedReminders,
+    canUseAdvancedTransparency,
+    verifyFeatureAccess
   }
 }
