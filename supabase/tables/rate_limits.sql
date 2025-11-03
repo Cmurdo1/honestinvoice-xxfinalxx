@@ -1,0 +1,10 @@
+CREATE TABLE rate_limits (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    endpoint VARCHAR(255) NOT NULL,
+    request_count INTEGER DEFAULT 0,
+    window_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    tier VARCHAR(50) DEFAULT 'free',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

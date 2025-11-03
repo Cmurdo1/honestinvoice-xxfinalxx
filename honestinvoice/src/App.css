@@ -1,0 +1,141 @@
+#root {
+  margin: 0 auto;
+}
+
+/* PWA Optimizations */
+* {
+  -webkit-tap-highlight-color: rgba(37, 99, 235, 0.1);
+  -webkit-touch-callout: none;
+}
+
+/* Touch-friendly interactions */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Safe area insets for notched devices */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* PWA Animations */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Mobile-optimized scrolling */
+.smooth-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent scroll on body when modal is open (mobile) */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* Optimized for PWA installation */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Loading spinner optimization */
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-spin {
+    animation: logo-spin 1s linear infinite;
+  }
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* Image optimization */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Prevent text selection on interactive elements */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS momentum scrolling */
+.ios-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Haptic feedback simulation (visual) */
+@keyframes haptic-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.haptic-feedback:active {
+  animation: haptic-pulse 0.1s ease-out;
+}
