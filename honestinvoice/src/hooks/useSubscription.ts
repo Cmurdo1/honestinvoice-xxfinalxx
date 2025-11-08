@@ -108,9 +108,10 @@ export function useSubscription() {
   }, [user])
 
   const canCreateInvoice = () => {
-    if (!features || !usage) return false
+    if (!features) return false
     if (features.max_invoices === -1) return true // Unlimited
-    return usage.invoices_created < features.max_invoices
+    const invoicesCreated = usage?.invoices_created ?? 0
+    return invoicesCreated < features.max_invoices
   }
 
   const canAddTeamMember = () => {
