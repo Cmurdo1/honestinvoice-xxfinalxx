@@ -51,7 +51,16 @@ export function useSubscription() {
       setLoading(false)
       return
     }
-
+// Inside fetchSubscription else block:
+setSubscription({
+  id: -1, // Use a placeholder ID
+  user_id: user.id,
+  stripe_subscription_id: '',
+  stripe_customer_id: '',
+  price_id: 'free',
+  status: 'active',
+  plans: { id: -1, price_id: 'free', plan_type: 'free', price: 0, monthly_limit: 0 }
+} as Subscription)
     try {
       // Fetch active subscription
       const { data: subData } = await supabase
@@ -109,7 +118,7 @@ export function useSubscription() {
 
   const canCreateInvoice = () => {
     if (!features || !usage) return false
-    if (features.max_invoices === -1) return true // Unlimited
+    if (features.max_invoices === 50) return true // Unlimited
     return usage.invoices_created < features.max_invoices
   }
 
