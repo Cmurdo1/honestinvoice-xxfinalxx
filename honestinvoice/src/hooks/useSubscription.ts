@@ -1,14 +1,16 @@
+// src/lib/hooks/useSubscription.ts
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase'; // Assuming path to your supabase client
 import { useAuth } from '../contexts/AuthContext'; // Get user/session from AuthContext
-import { checkUserFeatureAccess, fetchUserFeatureKeys } from '../lib/subscription-utils'; // Import new utilities
+import { fetchUserFeatureKeys } from '../lib/subscription-utils'; // Import the new utility
 
 // --- Interfaces for your plan data ---
-// We pull 'invoice_limit' directly from the plan
 export interface SubscriptionPlan {
   id: number
   plan_type: string
-  invoice_limit: number // The limit (e.g., 50) from your subscription_plans table
+  invoice_limit: number // From subscription_plans table
+  max_team_members: number // Assuming this column exists on subscription_plans
 }
 
 // Subscription is linked to the plan
@@ -16,8 +18,7 @@ export interface Subscription {
   id: number
   user_id: string
   status: string
-  plans: SubscriptionPlan // Contains the plan limits
-  // Other Stripe details removed for brevity
+  plans: SubscriptionPlan
 }
 
 // Usage data for the current month
@@ -28,7 +29,7 @@ export interface UsageData {
 }
 
 // --- Feature Keys Mapping ---
-// Define your unique feature keys once
+// Define your unique feature keys once (based on your features)
 export const FeatureKeys = {
   // Free Features
   BASIC_CUSTOMER_MANAGEMENT: 'BASIC_CUSTOMER_MANAGEMENT',
@@ -39,6 +40,7 @@ export const FeatureKeys = {
   TEAM_MANAGEMENT: 'TEAM_MANAGEMENT',
   API_ACCESS: 'API_ACCESS',
   CUSTOM_INVOICE_TEMPLATES: 'CUSTOM_INVOICE_TEMPLATES',
+  // Add all other keys from your subscription_features table
 } as const;
 
 
@@ -58,34 +60,37 @@ export function useSubscription() {
 
     try {
       // 1. Fetch Subscription and Plan Limits
-      // Fetching from 'user_subscriptions' which links to 'subscription_plans'
       const { data: subData } = await supabase
         .from('user_subscriptions')
         .select(`
           *,
-          plans:plan_id (plan_type, invoice_limit)
+          plans:plan_id (plan_type, invoice_limit, max_team_members)
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle();
 
+      let currentSubscription: Subscription;
+
       if (subData) {
-        setSubscription(subData as unknown as Subscription);
+        currentSubscription = subData as unknown as Subscription;
+        setSubscription(currentSubscription);
       } else {
-        // If no active subscription, default to Free Plan data (assuming Free plan ID is 1)
+        // Default to Free Plan data (Plan ID 1) if no active subscription is found
         const { data: freePlanData } = await supabase
           .from('subscription_plans')
-          .select('id, plan_type, invoice_limit')
-          .eq('id', 1) // Assuming 1 is the ID for the Free Plan
+          .select('id, plan_type, invoice_limit, max_team_members')
+          .eq('id', 1) // Assumes 1 is the ID for the Free Plan
           .single();
 
-        // Simulate a 'free' subscription object
-        setSubscription({
+        currentSubscription = {
           id: -1, 
           user_id: user.id,
           status: 'active',
           plans: freePlanData as unknown as SubscriptionPlan
-        } as unknown as Subscription);
+        } as unknown as Subscription;
+
+        setSubscription(currentSubscription);
       }
 
       // 2. Fetch all Feature Keys using the new RPC function
@@ -122,23 +127,23 @@ export function useSubscription() {
     return features.has(key);
   };
 
-  // --- Invoice Limit Check (The FIX) ---
+  // --- Invoice Limit Check (THE FIX) ---
   const canCreateInvoice = () => {
     if (!usage || !subscription) return false;
 
-    // Pro and Business users have the UNLIMITED_INVOICES feature key
+    // Check for the UNLIMITED_INVOICES feature key (Pro/Business)
     if (userHasFeature(FeatureKeys.UNLIMITED_INVOICES)) {
       return true;
     }
 
-    // Free users (or any limited user) have the invoice_limit on their plan
+    // Free users (or any limited user) check against the limit from the plan
     const limit = subscription.plans.invoice_limit;
 
     if (limit > 0) {
       return usage.invoices_created < limit;
     }
 
-    // Default: if no limit is set and no unlimited feature, restrict access
+    // If limit is 0 and they don't have the unlimited feature, assume no access
     return false; 
   };
   
@@ -146,19 +151,22 @@ export function useSubscription() {
   const canAddTeamMember = () => {
     if (!usage || !subscription) return false;
     
-    // We didn't migrate max_team_members, but assume it's stored on the plan
-    const limit = subscription.plans.max_team_members || 0; // Assuming this column exists on subscription_plans
+    // Check against the numerical limit from the plan
+    const limit = subscription.plans.max_team_members || 0; 
+
+    if (limit > 0) {
+      return usage.team_members < limit;
+    }
     
-    // If the team limit is not set on the plan, check for the boolean feature
-    if (limit === 0 && userHasFeature(FeatureKeys.TEAM_MANAGEMENT)) {
-      // If feature is present and limit is 0, assume it's a fixed limit (e.g., 10)
-      return usage.team_members < 10;
+    // If limit is 0 and they have the TEAM_MANAGEMENT feature, use a default limit (e.g., 10)
+    if (userHasFeature(FeatureKeys.TEAM_MANAGEMENT)) {
+        return usage.team_members < 10;
     }
 
-    return usage.team_members < limit;
+    return false;
   };
 
-  // --- Simplified Feature Checker (for legacy calls) ---
+  // --- Simplified Feature Checker ---
   const hasFeature = (key: keyof typeof FeatureKeys) => userHasFeature(key);
 
   return {
