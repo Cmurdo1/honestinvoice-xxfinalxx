@@ -1,4 +1,32 @@
 import { TrendingUp, DollarSign, FileText, Shield } from 'lucide-react'
+// src/components/Analytics.tsx
+
+import { useSubscription, FeatureKeys } from '../lib/hooks/useSubscription'; 
+import PaywallModal from './PaywallModal'; // Assuming you have a modal component
+
+export default function Analytics() {
+  const { userHasFeature, isLoadingFeatures } = useSubscription();
+
+  if (isLoadingFeatures) {
+    return <div>Loading subscription data...</div>;
+  }
+  
+  // 1. Check access using the hook function
+  const hasAdvancedAnalytics = userHasFeature(FeatureKeys.ADVANCED_ANALYTICS);
+
+  if (!hasAdvancedAnalytics) {
+    // 2. Display a paywall or upgrade message
+    return <PaywallModal feature="Advanced Analytics" />;
+  }
+
+  // 3. User has access, render the feature
+  return (
+    <div>
+      <h1>Advanced Analytics Dashboard</h1>
+      {/* ... rest of your analytics components */}
+    </div>
+  );
+}
 
 interface AnalyticsProps {
   stats: {
