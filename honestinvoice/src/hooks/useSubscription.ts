@@ -1,6 +1,62 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+// src/lib/hooks/useSubscription.ts (Update this file)
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext'; // Assuming you get user/session from AuthContext
+import { fetchUserFeatureKeys } from '../lib/subscription-utils'; // Import the new utility
+
+// Define your feature keys (optional, but good practice)
+export const FeatureKeys = {
+  ADVANCED_ANALYTICS: 'ADVANCED_ANALYTICS',
+  TEAM_MANAGEMENT: 'TEAM_MANAGEMENT',
+  API_ACCESS: 'API_ACCESS',
+  UNLIMITED_INVOICES: 'UNLIMITED_INVOICES',
+  // ... add all your keys here
+} as const;
+
+export type FeatureMap = Record<keyof typeof FeatureKeys, boolean>;
+
+export function useSubscription() {
+  const { user } = useAuth(); // Get the user object from your auth context
+  // Store the features as a Set for O(1) lookups
+  const [features, setFeatures] = useState<Set<string>>(new Set());
+  const [isLoadingFeatures, setIsLoadingFeatures] = useState(true);
+
+  useEffect(() => {
+    if (user?.id) {
+      setIsLoadingFeatures(true);
+      fetchUserFeatureKeys(user.id)
+        .then(keys => {
+          setFeatures(new Set(keys));
+        })
+        .catch(err => {
+          console.error("Failed to load user features:", err);
+          setFeatures(new Set()); // Clear features on error
+        })
+        .finally(() => {
+          setIsLoadingFeatures(false);
+        });
+    } else {
+      setFeatures(new Set());
+      setIsLoadingFeatures(false);
+    }
+  }, [user?.id]);
+
+
+  // THE NEW, CENTRAL CHECK FUNCTION
+  const userHasFeature = (key: keyof typeof FeatureKeys): boolean => {
+    return features.has(key);
+  };
+
+  return { 
+    // ... other subscription data (plan_id, status, etc.)
+    features,
+    isLoadingFeatures,
+    userHasFeature, // <-- This is the function you'll use everywhere
+  };
+}
 
 export interface SubscriptionPlan {
   id: number
