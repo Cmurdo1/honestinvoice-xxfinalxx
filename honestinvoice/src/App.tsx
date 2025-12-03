@@ -13,7 +13,6 @@ import './App.css'
 const AuthPage = lazy(() => import('./components/AuthPage'))
 const Dashboard = lazy(() => import('./components/Dashboard'))
 const PricingPage = lazy(() => import('./components/PricingPage'))
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const APIKeyManagement = lazy(() => import('./components/APIKeyManagement'))
 const APIDocumentation = lazy(() => import('./components/APIDocumentation'))
 
@@ -70,12 +69,6 @@ function AppContent() {
         <Route path="/pricing" element={
           <Suspense fallback={<LoadingScreen />}>
             <PricingPage />
-          </Suspense>
-        } />
-        
-        <Route path="/admin" element={
-          <Suspense fallback={<LoadingScreen />}>
-            {!session ? <Navigate to="/" /> : <AdminDashboard />}
           </Suspense>
         } />
         
