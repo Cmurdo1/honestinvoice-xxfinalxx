@@ -1,152 +1,173 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
+// src/lib/hooks/useSubscription.ts
 
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase'; // Assuming path to your supabase client
+import { useAuth } from '../contexts/AuthContext'; // Get user/session from AuthContext
+import { fetchUserFeatureKeys } from '../lib/subscription-utils'; // Import the new utility
+
+// --- Interfaces for your plan data ---
 export interface SubscriptionPlan {
   id: number
-  price_id: string
   plan_type: string
-  price: number
-  monthly_limit: number
+  invoice_limit: number // From subscription_plans table
+  max_team_members: number // Assuming this column exists on subscription_plans
 }
 
+// Subscription is linked to the plan
 export interface Subscription {
   id: number
   user_id: string
-  stripe_subscription_id: string
-  stripe_customer_id: string
-  price_id: string
   status: string
   plans: SubscriptionPlan
 }
 
-export interface SubscriptionFeatures {
-  max_invoices: number
-  max_team_members: number
-  has_analytics: boolean
-  has_custom_branding: boolean
-  has_api_access: boolean
-  has_advanced_reporting: boolean
-  has_priority_support: boolean
-  has_custom_templates: boolean
-  has_automated_reminders: boolean
-  has_advanced_transparency: boolean
-}
-
+// Usage data for the current month
 export interface UsageData {
   invoices_created: number
   api_calls: number
   team_members: number
 }
 
-export function useSubscription() {
-  const { user } = useAuth()
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [features, setFeatures] = useState<SubscriptionFeatures | null>(null)
-  const [usage, setUsage] = useState<UsageData | null>(null)
-  const [loading, setLoading] = useState(true)
+// --- Feature Keys Mapping ---
+// Define your unique feature keys once (based on your features)
+export const FeatureKeys = {
+  // Free Features
+  BASIC_CUSTOMER_MANAGEMENT: 'BASIC_CUSTOMER_MANAGEMENT',
+  // Pro Features
+  ADVANCED_ANALYTICS: 'ADVANCED_ANALYTICS',
+  UNLIMITED_INVOICES: 'UNLIMITED_INVOICES', // Key for Pro/Business
+  // Business Features
+  TEAM_MANAGEMENT: 'TEAM_MANAGEMENT',
+  API_ACCESS: 'API_ACCESS',
+  CUSTOM_INVOICE_TEMPLATES: 'CUSTOM_INVOICE_TEMPLATES',
+  // Add all other keys from your subscription_features table
+} as const;
 
-  const fetchSubscription = async () => {
+
+// --- The Unified Hook ---
+export function useSubscription() {
+  const { user } = useAuth();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [features, setFeatures] = useState<Set<string>>(new Set()); // New feature set from RPC
+  const [usage, setUsage] = useState<UsageData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSubscriptionData = async () => {
     if (!user) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
 
     try {
-      // Fetch active subscription
+      // 1. Fetch Subscription and Plan Limits
       const { data: subData } = await supabase
-        .from('subscriptions')
+        .from('user_subscriptions')
         .select(`
           *,
-          plans!price_id(*)
+          plans:plan_id (plan_type, invoice_limit, max_team_members)
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .maybeSingle()
+        .maybeSingle();
+
+      let currentSubscription: Subscription;
 
       if (subData) {
-        setSubscription(subData as Subscription)
-        
-        // Fetch features for this plan
-        const { data: featuresData } = await supabase
-          .from('subscription_features')
-          .select('*')
-          .eq('plan_type', subData.plans.plan_type)
-          .single()
-
-        setFeatures(featuresData)
+        currentSubscription = subData as unknown as Subscription;
+        setSubscription(currentSubscription);
       } else {
-        // Default to free plan if no subscription
-        const { data: featuresData } = await supabase
-          .from('subscription_features')
-          .select('*')
-          .eq('plan_type', 'free')
-          .single()
+        // Default to Free Plan data (Plan ID 1) if no active subscription is found
+        const { data: freePlanData } = await supabase
+          .from('subscription_plans')
+          .select('id, plan_type, invoice_limit, max_team_members')
+          .eq('id', 1) // Assumes 1 is the ID for the Free Plan
+          .single();
 
-        setFeatures(featuresData)
+        currentSubscription = {
+          id: -1, 
+          user_id: user.id,
+          status: 'active',
+          plans: freePlanData as unknown as SubscriptionPlan
+        } as unknown as Subscription;
+
+        setSubscription(currentSubscription);
       }
 
-      // Fetch current month usage
-      const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+      // 2. Fetch all Feature Keys using the new RPC function
+      const keys = await fetchUserFeatureKeys(user.id);
+      setFeatures(new Set(keys));
+
+      // 3. Fetch current month usage
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
       const { data: usageData } = await supabase
         .from('subscription_usage')
-        .select('*')
+        .select('invoices_created, api_calls, team_members')
         .eq('user_id', user.id)
         .eq('month', currentMonth)
-        .maybeSingle()
+        .maybeSingle();
 
-      setUsage(usageData || { invoices_created: 0, api_calls: 0, team_members: 0 })
+      setUsage(usageData || { invoices_created: 0, api_calls: 0, team_members: 0 });
+
     } catch (error) {
-      console.error('Error fetching subscription:', error)
+      console.error('Error fetching subscription:', error);
+      setSubscription(null);
+      setFeatures(new Set());
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchSubscription()
-  }, [user])
+    fetchSubscriptionData();
+  }, [user?.id]);
 
+
+  // CENTRAL BOOLEAN CHECK FUNCTION (uses the fetched Set)
+  const userHasFeature = (key: keyof typeof FeatureKeys): boolean => {
+    return features.has(key);
+  };
+
+  // --- Invoice Limit Check (THE FIX) ---
   const canCreateInvoice = () => {
-    if (!features || !usage) return false
-    if (features.max_invoices === -1) return true // Unlimited
-    return usage.invoices_created < features.max_invoices
-  }
+    if (!usage || !subscription) return false;
 
+    // Check for the UNLIMITED_INVOICES feature key (Pro/Business)
+    if (userHasFeature(FeatureKeys.UNLIMITED_INVOICES)) {
+      return true;
+    }
+
+    // Free users (or any limited user) check against the limit from the plan
+    const limit = subscription.plans.invoice_limit;
+
+    if (limit > 0) {
+      return usage.invoices_created < limit;
+    }
+
+    // If limit is 0 and they don't have the unlimited feature, assume no access
+    return false; 
+  };
+  
+  // --- Team Member Limit Check (Example) ---
   const canAddTeamMember = () => {
-    if (!features || !usage) return false
-    return usage.team_members < features.max_team_members
-  }
+    if (!usage || !subscription) return false;
+    
+    // Check against the numerical limit from the plan
+    const limit = subscription.plans.max_team_members || 0; 
 
-  const hasFeature = (feature: keyof SubscriptionFeatures) => {
-    return features?.[feature] === true
-  }
-
-  // Specific feature checkers for new Business-tier features
-  const canAccessAPI = () => hasFeature('has_api_access')
-  const canUseCustomTemplates = () => hasFeature('has_custom_templates')
-  const canUseAutomatedReminders = () => hasFeature('has_automated_reminders')
-  const canUseAdvancedTransparency = () => hasFeature('has_advanced_transparency')
-
-  // Comprehensive subscription verification for features
-  const verifyFeatureAccess = (feature: 'api' | 'custom_templates' | 'automated_reminders' | 'advanced_transparency') => {
-    const featureMap = {
-      api: canAccessAPI(),
-      custom_templates: canUseCustomTemplates(),
-      automated_reminders: canUseAutomatedReminders(),
-      advanced_transparency: canUseAdvancedTransparency()
+    if (limit > 0) {
+      return usage.team_members < limit;
     }
     
-    return featureMap[feature] || false
-  }
+    // If limit is 0 and they have the TEAM_MANAGEMENT feature, use a default limit (e.g., 10)
+    if (userHasFeature(FeatureKeys.TEAM_MANAGEMENT)) {
+        return usage.team_members < 10;
+    }
 
-  const getPlanType = () => {
-    return subscription?.plans.plan_type || 'free'
-  }
+    return false;
+  };
 
-  const refreshSubscription = () => {
-    return fetchSubscription()
-  }
+  // --- Simplified Feature Checker ---
+  const hasFeature = (key: keyof typeof FeatureKeys) => userHasFeature(key);
 
   return {
     subscription,
@@ -156,12 +177,7 @@ export function useSubscription() {
     canCreateInvoice,
     canAddTeamMember,
     hasFeature,
-    getPlanType,
-    refreshSubscription,
-    canAccessAPI,
-    canUseCustomTemplates,
-    canUseAutomatedReminders,
-    canUseAdvancedTransparency,
-    verifyFeatureAccess
-  }
+    userHasFeature, // New, centralized check
+    refreshSubscription: fetchSubscriptionData,
+  };
 }
