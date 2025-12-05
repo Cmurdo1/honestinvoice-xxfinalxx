@@ -1,32 +1,6 @@
 import { TrendingUp, DollarSign, FileText, Shield } from 'lucide-react'
-// src/components/Analytics.tsx
-
-import { useSubscription, FeatureKeys } from '../lib/hooks/useSubscription'; 
-import PaywallModal from './PaywallModal'; // Assuming you have a modal component
-
-export default function Analytics() {
-  const { userHasFeature, isLoadingFeatures } = useSubscription();
-
-  if (isLoadingFeatures) {
-    return <div>Loading subscription data...</div>;
-  }
-  
-  // 1. Check access using the hook function
-  const hasAdvancedAnalytics = userHasFeature(FeatureKeys.ADVANCED_ANALYTICS);
-
-  if (!hasAdvancedAnalytics) {
-    // 2. Display a paywall or upgrade message
-    return <PaywallModal feature="Advanced Analytics" />;
-  }
-
-  // 3. User has access, render the feature
-  return (
-    <div>
-      <h1>Advanced Analytics Dashboard</h1>
-      {/* ... rest of your analytics components */}
-    </div>
-  );
-}
+import { useSubscription, FeatureKeys } from '../hooks/useSubscription';
+import PaywallModal from './PaywallModal';
 
 interface AnalyticsProps {
   stats: {
@@ -38,7 +12,19 @@ interface AnalyticsProps {
 }
 
 export default function Analytics({ stats }: AnalyticsProps) {
-  const paymentRate = stats.totalInvoices > 0 
+  const { userHasFeature, isLoadingFeatures } = useSubscription();
+
+  if (isLoadingFeatures) {
+    return <div>Loading subscription data...</div>;
+  }
+
+  const hasAdvancedAnalytics = userHasFeature(FeatureKeys.ADVANCED_ANALYTICS);
+
+  if (!hasAdvancedAnalytics) {
+    return <PaywallModal feature="Advanced Analytics" />;
+  }
+
+  const paymentRate = stats.totalInvoices > 0
     ? ((stats.paidInvoices / stats.totalInvoices) * 100).toFixed(1)
     : 0
 
@@ -123,7 +109,7 @@ export default function Analytics({ stats }: AnalyticsProps) {
             <div className="flex items-center justify-between">
               <span className="text-gray-600">Average Invoice Value</span>
               <span className="font-semibold text-gray-900">
-                ${stats.totalInvoices > 0 
+                ${stats.totalInvoices > 0
                   ? (stats.totalRevenue / stats.totalInvoices).toFixed(2)
                   : 0}
               </span>
@@ -157,7 +143,7 @@ export default function Analytics({ stats }: AnalyticsProps) {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-gray-600">Transparency Rating</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {stats.avgTransparencyScore >= 80 ? 'Excellent' : 
+                  {stats.avgTransparencyScore >= 80 ? 'Excellent' :
                    stats.avgTransparencyScore >= 60 ? 'Good' : 'Needs Improvement'}
                 </span>
               </div>
@@ -173,7 +159,7 @@ export default function Analytics({ stats }: AnalyticsProps) {
             </div>
             <p className="text-sm text-gray-600">
               Your invoices demonstrate{' '}
-              {stats.avgTransparencyScore >= 80 ? 'exceptional' : 
+              {stats.avgTransparencyScore >= 80 ? 'exceptional' :
                stats.avgTransparencyScore >= 60 ? 'good' : 'room for improvement in'}{' '}
               transparency with comprehensive documentation and clear fee structures.
             </p>
